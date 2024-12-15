@@ -1,0 +1,369 @@
+#include <bits/stdc++.h>
+using namespace std;
+void login(bool& b,string& name,string& home,
+vector<vector<string>>& userdata,unordered_map<string,int> cityid){
+       cout<<"WELCOME TO LOGIN PAGE"<<endl;
+       cout<<"Press 1 to continue as guest user"<<endl;
+       cout<<"Press 2 to login"<<endl;
+       cout<<"Press 3 to create account"<<endl;
+       b=1;
+       int c;
+       cin>>c;
+       if(c==1) return;
+       if(c==2){
+           cout<<"Enter username"<<endl;
+           string un;
+           cin>>un;
+           cout<<"Enter Password"<<endl;
+           string pass;
+           cin>>pass;
+           for(auto it:userdata){
+               if(it[0]==un && it[1]==pass){
+                   b=1;
+                   name=it[3];
+                   home=it[2];
+                   return;
+               }
+           }
+           cout<<"Incorrect credintials"<<endl;
+           login(b,name,home,userdata,cityid);
+       }
+       if(c==3){
+           cout<<"Hey whats your name?"<<endl;
+           string nam;
+           cin>>nam;
+           cout<<"Enter a username:"<<endl;
+           string un;
+           cin>>un;
+           cout<<"Enter your home city:"<<endl;
+           string city;
+           cin>>city;
+           cout<<"Choose a password:"<<endl;
+           string pas;
+           cin>>pas;
+           bool isdup=0;
+           for(auto it:userdata){
+               if(it[0]==un) {
+                   isdup=1;
+                   cout<<"User with this username already exists, please choose some other username."<<endl;
+                   break;
+               }
+           }
+           if(cityid[city]==0){
+               isdup=1;
+               cout<<"Invalid home city"<<endl;
+           }
+           if(isdup==1) {
+               login(b,name,home,userdata,cityid);
+           }
+           else {
+               userdata.push_back({un,pas,city,nam});
+               b=1;
+               name=nam;
+               home=city;
+           }
+       }
+   }
+void printpath(vector<int>& sp,vector<vector<int>>& touchedby,unordered_map<int,string> cityid2,unordered_map<int,string>shid2,unordered_map<string,int> cityid,unordered_map<string,int> shid,int src,int dest,bool istraffic){
+    int i=dest;
+    vector<string> path;
+    while(i!=src){
+        int f=10;
+        if(istraffic) f=touchedby[i][4];
+        int time=(touchedby[i][2]*1000)/1333;
+        time*=f;
+        time/=10;
+        string dir="";
+        if(touchedby[i][3]==1) dir="South";
+        if(touchedby[i][3]==2) dir="North";
+        if(touchedby[i][3]==3) dir="East";
+        if(touchedby[i][3]==4) dir="West";
+        string ele="to "+cityid2[i]+" via "+shid2[touchedby[i][1]]+" towards "+dir+" "+"("+to_string(touchedby[i][2])+" KMs "+to_string(time)+" MINs),\n then";
+        path.push_back(ele);
+        i=touchedby[i][0];
+    }
+    path.push_back("Start from "+cityid2[src]);
+    reverse(path.begin(),path.end());
+    for(auto it:path) cout<<it<<" ";
+    cout<<"Destination Reached!"<<endl<<endl;
+}
+int withtraffic(vector<vector<vector<int>>>& adj,int src,int dest,unordered_map<int,string> cityid2,unordered_map<int,string>shid2,unordered_map<string,int> cityid,unordered_map<string,int> shid){
+    vector<int> sp(adj.size(),INT_MAX);
+    vector<vector<int>> touchedby(adj.size());
+    touchedby[src]={0,0,0};
+    sp[src]=0;
+    set<vector<int>> myset;
+    myset.insert({0,src});
+    while(!myset.empty()){
+        vector<int> vec=*myset.begin();
+        int d=vec[0];
+        int n=vec[1];
+        myset.erase(vec);
+        for(auto it:adj[n]){
+        if(sp[it[0]]>sp[n]+(it[2]*it[4])/10){
+            if(sp[it[0]]!=INT_MAX) myset.erase({sp[it[0]],it[0]});
+            sp[it[0]]=sp[n]+(it[2]*it[4])/10;
+            touchedby[it[0]]={n,it[1],it[2],it[3],it[4]};
+            myset.insert({sp[it[0]],it[0]});
+        }
+        }
+    }
+    if(sp[dest]==INT_MAX) {
+        cout<<"Unfortunately, it seems there's no available path from "<<cityid2[src]<<" to "<<cityid2[dest]<<" at the moment.  We look forward to welcoming you again with a better route next time!";
+        return -1;
+    }
+    printpath(sp,touchedby,cityid2,shid2,cityid,shid,src,dest,1);
+    return sp[dest];
+    
+}
+
+
+int withouttraffic(vector<vector<vector<int>>>& adj,int src,int dest,unordered_map<int,string> cityid2,unordered_map<int,string>shid2,unordered_map<string,int> cityid,unordered_map<string,int> shid){
+    vector<int> sp(adj.size(),INT_MAX);
+    vector<vector<int>> touchedby(adj.size());
+    sp[src]=0;
+    touchedby[src]={0,0,0};
+    set<vector<int>> myset;
+    myset.insert({0,src});
+    while(!myset.empty()){
+        vector<int> vec=*myset.begin();
+        int d=vec[0];
+        int n=vec[1];
+        myset.erase(vec);
+        for(auto it:adj[n]){
+        if(sp[it[0]]>sp[n]+it[2]){
+            if(sp[it[0]]!=INT_MAX) myset.erase({sp[it[0]],it[0]});
+            sp[it[0]]=sp[n]+it[2];
+            touchedby[it[0]]={n,it[1],it[2],it[3],it[4]};
+            myset.insert({sp[it[0]],it[0]});
+        }
+        }
+    }
+    printpath(sp,touchedby,cityid2,shid2,cityid,shid,src,dest,0);
+    return sp[dest];
+    
+}
+
+int main(){
+    vector<tuple<string,string,string,int,char,float>> roads={
+    {"Bhopal", "Indore", "SH 18", 200, 'N', 1.2f},
+    {"Bhopal", "Gwalior", "SH 19", 300, 'S', 1.1f},
+    {"Indore", "Ujjain", "SH 27", 55, 'N', 1.0f},
+    {"Indore", "Ratlam", "SH 27", 90, 'N', 1.3f},
+    {"Gwalior", "Jabalpur", "SH 22", 250, 'N', 1.0f},
+    {"Gwalior", "Shivpuri", "SH 19", 120, 'S', 1.2f},
+    {"Jabalpur", "Sagar", "SH 23", 180, 'S', 1.1f},
+    {"Ujjain", "Dewas", "SH 18", 30, 'N', 0.9f},
+    {"Sagar", "Rewa", "SH 26", 220, 'S', 1.5f},
+    {"Rewa", "Satna", "SH 12", 70, 'N', 1.0f},
+    {"Dewas", "Chhindwara", "SH 18", 160, 'S', 1.4f},
+    {"Morena", "Shivpuri", "SH 22", 100, 'N', 1.3f},
+    {"Vidisha", "Betul", "SH 18", 130, 'S', 1.1f},
+    {"Betul", "Neemuch", "SH 24", 160, 'N', 1.0f},
+    {"Seoni", "Damoh", "SH 26", 170, 'N', 1.4f},
+    {"Mandsaur", "Khandwa", "SH 18", 140, 'S', 1.2f},
+    {"Burhanpur", "Singrauli", "SH 35", 280, 'N', 1.5f},
+    {"Shahdol", "Pithampur", "SH 33", 120, 'N', 1.0f},
+    {"Katni", "Itarsi", "SH 42", 200, 'S', 1.3f},
+    {"Hoshangabad", "Harda", "SH 22", 50, 'N', 1.1f},
+    {"Mandla", "Sehore", "SH 37", 160, 'S', 1.4f},
+    {"Balaghat", "Raisen", "SH 11", 130, 'N', 1.2f},
+    {"Narsinghpur", "Chhatarpur", "SH 17", 210, 'S', 1.5f},
+    {"Tikamgarh", "Bhind", "SH 34", 180, 'S', 1.1f},
+    {"Alirajpur", "Barwani", "SH 15", 70, 'S', 1.0f},
+    {"Rajgarh", "Dhar", "SH 33", 100, 'N', 1.3f},
+    {"Anuppur", "Ashoknagar", "SH 26", 150, 'N', 1.2f},
+    {"Dindori", "Datia", "SH 16", 110, 'S', 1.4f},
+    {"Guna", "Khargone", "SH 12", 160, 'N', 1.1f},
+    {"Jhabua", "Sidhi", "SH 31", 210, 'S', 1.3f},
+    {"Umaria", "Sheopur", "SH 35", 200, 'N', 1.2f},
+    {"Shajapur", "Agar-Malwa", "SH 30", 50, 'S', 1.5f},
+    {"Panna", "Burhar", "SH 29", 160, 'N', 1.0f},
+    {"Maihar", "Nagda", "SH 12", 80, 'S', 1.1f},
+    {"Maheshwar", "Bina", "SH 42", 90, 'N', 1.2f},
+    {"Barhi", "Shujalpur", "SH 37", 100, 'S', 1.4f},
+    {"Neemuch", "Sanawad", "SH 13", 120, 'S', 1.0f},
+    {"Badnagar", "Ashtha", "SH 15", 140, 'N', 1.3f},
+    {"Jaora", "Tikri", "SH 17", 70, 'S', 1.2f},
+    {"Pandhurna", "Khurai", "SH 41", 140, 'N', 1.1f},
+    {"Gotegaon", "Shahgarh", "SH 12", 110, 'S', 1.5f},
+    {"Rajpur", "Bhikangaon", "SH 26", 90, 'S', 1.0f},
+    {"Kolaras", "Niwari", "SH 18", 180, 'N', 1.4f},
+    {"Orchha", "Suwasra", "SH 33", 170, 'S', 1.3f},
+    {"Badwani", "Kukshi", "SH 35", 50, 'N', 1.2f},
+    {"Sendhwa", "Shahdol", "SH 20", 210, 'N', 1.1f},
+    {"Sarangpur", "Sailana", "SH 40", 90, 'S', 1.5f},
+    {"Lahar", "Tendukheda", "SH 39", 100, 'N', 1.0f},
+    {"Rampur Baghelan", "Vijaypur", "SH 24", 120, 'S', 1.2f},
+    {"Hatta", "Manawar", "SH 21", 160, 'N', 1.4f},
+    {"Banapura", "Kannod", "SH 34", 50, 'S', 1.3f},
+    {"Pipariya", "Chichli", "SH 20", 60, 'N', 1.1f},
+    {"Porsa", "Malthone", "SH 42", 140, 'N', 1.2f},
+    {"Bhopal", "Dewas", "SH 18", 110, 'S', 1.0f},
+    {"Bhopal", "Raisen", "SH 22", 130, 'S', 1.3f},
+    {"Indore", "Dewas", "SH 18", 70, 'N', 1.2f},
+    {"Indore", "Mandsaur", "SH 27", 180, 'N', 1.0f},
+    {"Ujjain", "Jabalpur", "SH 23", 150, 'N', 1.3f},
+    {"Gwalior", "Mandla", "SH 11", 190, 'S', 1.4f},
+    {"Katni", "Damoh", "SH 26", 200, 'S', 1.1f},
+    {"Betul", "Khandwa", "SH 18", 100, 'N', 1.2f},
+    {"Sagar", "Seoni", "SH 37", 230, 'N', 1.0f},
+    {"Rewa", "Panna", "SH 42", 160, 'S', 1.3f},
+    {"Khargone", "Kukshi", "SH 35", 210, 'N', 1.2f},
+    {"Barwani", "Pithampur", "SH 19", 180, 'S', 1.4f},
+    {"Tikamgarh", "Katni", "SH 15", 90, 'N', 1.1f},
+    {"Shivpuri", "Sagar", "SH 18", 120, 'S', 1.0f},
+    {"Pithampur", "Dewas", "SH 27", 200, 'S', 1.2f},
+    {"Rewa", "Satna", "SH 11", 130, 'N', 1.5f},
+    {"Burhanpur", "Guna", "SH 26", 160, 'S', 1.4f},
+    {"Shahdol", "Sidhi", "SH 33", 110, 'N', 1.3f},
+    {"Sehore", "Rajgarh", "SH 37", 130, 'S', 1.2f},
+    {"Mandla", "Seoni", "SH 22", 140, 'S', 1.4f},
+    {"Mandsaur", "Ratlam", "SH 23", 50, 'N', 1.0f},
+    {"Shivpuri", "Ratlam", "SH 19", 160, 'N', 1.3f},
+    {"Raisen", "Jabalpur", "SH 27", 170, 'N', 1.1f},
+    {"Khargone", "Barwani", "SH 24", 130, 'S', 1.0f},
+    {"Indore", "Dewas", "SH 37", 180, 'N', 1.5f},
+    {"Rewa", "Jabalpur", "SH 18", 140, 'S', 1.2f},
+    {"Katni", "Sidhi", "SH 15", 200, 'N', 1.4f},
+    {"Shivpuri", "Satna", "SH 11", 130, 'S', 1.0f},
+    {"Burhanpur", "Ujjain", "SH 37", 150, 'S', 1.2f},
+    {"Dewas", "Raisen", "SH 42", 100, 'N', 1.3f},
+    {"Pithampur", "Panna", "SH 11", 180, 'N', 1.5f},
+    {"Mandsaur", "Sagar", "SH 19", 220, 'S', 1.2f},
+    {"Sehore", "Ujjain", "SH 24", 90, 'S', 1.4f},
+    {"Guna", "Tikamgarh", "SH 18", 160, 'S', 1.1f},
+    {"Hoshangabad", "Mandla", "SH 15", 110, 'N', 1.3f},
+    {"Betul", "Pithampur", "SH 30", 180, 'S', 1.0f},
+    {"Shivpuri", "Khargone", "SH 27", 140, 'N', 1.4f},
+    {"Gwalior", "Betul", "SH 24", 100, 'S', 1.2f},
+    {"Indore", "Shajapur", "SH 11", 160, 'N', 1.1f},
+    {"Guna", "Jabalpur", "SH 37", 220, 'N', 1.3f},
+    {"Shivpuri", "Khargone", "SH 27", 180, 'S', 1.0f},
+    {"Ratlam", "Mandsaur", "SH 35", 50, 'S', 1.5f},
+    {"Gwalior", "Sagar", "SH 11", 210, 'N', 1.2f},
+    {"Seoni", "Indore", "SH 12", 230, 'S', 1.4f},
+    {"Pithampur", "Ujjain", "SH 33", 180, 'N', 1.3f},
+    {"Damoh", "Ujjain", "SH 37", 160, 'N', 1.1f},
+    {"Katni", "Indore", "SH 30", 140, 'S', 1.2f},
+    {"Bhopal", "Betul", "SH 18", 190, 'N', 1.3f},
+    {"Guna", "Ujjain", "SH 19", 170, 'S', 1.1f},
+    {"Mandla", "Sagar", "SH 12", 210, 'N', 1.4f},
+    {"Ratlam", "Gwalior", "SH 33", 50, 'N', 1.0f}
+    };
+    
+    unordered_map<string,int> cityid,shid;
+    unordered_map<int,string> cityid2,shid2;
+    int shc=1;
+    int cityc=1;
+    for(auto it:roads){
+        if(cityid[get<0>(it)]==0){
+            cityid[get<0>(it)]=cityc;
+            cityid2[cityc]=get<0>(it);
+            cityc++;
+        }
+        if(cityid[get<1>(it)]==0){
+            cityid[get<1>(it)]=cityc;
+            cityid2[cityc]=get<1>(it);
+            cityc++;
+        }
+        if(shid[get<2>(it)]==0){
+            shid[get<2>(it)]=shc;
+            shid2[shc]=get<2>(it);
+            shc++;
+        }
+    }
+    unordered_map<char,int> direction;
+    direction['N']=1;
+    direction['S']=2;
+    direction['W']=3;
+    direction['E']=4;
+    
+    unordered_map<char,int> oppdirection;
+    oppdirection['N']=2;
+    oppdirection['S']=1;
+    oppdirection['W']=4;
+    oppdirection['E']=3;
+    
+    vector<vector<vector<int>>> adj(cityc);
+    for(auto it:roads){
+        adj[cityid[get<0>(it)]].push_back({cityid[get<1>(it)],
+        shid[get<2>(it)],get<3>(it),direction[get<4>(it)],
+        static_cast<int>(get<5>(it)*10)});
+        adj[cityid[get<1>(it)]].push_back({cityid[get<0>(it)],
+        shid[get<2>(it)],get<3>(it),oppdirection[get<4>(it)],
+        static_cast<int>(get<5>(it)*10)});
+    }
+    
+   vector<vector<string>> userdata={
+       {"ubedzz49","12345678","Indore","Ubed"},
+       {"samidha2608","12345678","Indore","Samidha"},
+       {"souravkr","12341234","Bhopal","Sourav"},
+       {"atharvagupta","99887766","Jabalpur","Atharva"},
+       {"sahil","12345678","Chhindwara","Sahil"}
+   };
+   
+   int n=1;
+   bool b=0;
+   string name="guest";
+   string home="none";
+   int c=0;
+   while(n!=0){cout<<"------------------------------------------------------------------"<<endl;
+       if(b==0) login(b,name,home,userdata,cityid);
+       c++;
+       if(c>100){
+           cout<<"Apologies, the session expired."<<endl;
+           break;
+       }
+       cout<<"Hello "<<name<<endl;
+       cout<<"WELCOME TO DASHBOARD"<<endl;
+       cout<<"Press 1 to find path to a city from your hometown. (not for guest users)"<<endl;
+       cout<<"Press 2 to find path to a city from any city."<<endl;
+       cout<<"Press 3 to go to login page."<<endl;
+       cout<<"Press 0 to exit"<<endl;
+       cin>>n;
+       if(n==3){
+           login(b,name,home,userdata,cityid);
+       }
+       if(n==1){
+           if(home=="none") cout<<"Sorry this feature is not for guest users"<<endl;
+           else
+           {
+               cout<<"Enter destination:"<<endl;
+               string destination;
+               cin>>destination;
+                 if(cityid[destination]==0){
+               cout<<"Sorry currently we dont have data for the entered destination city"<<endl;
+               continue;
+           }
+               cout<<"do you want to consider traffic ? (0 for no and 1 for yes)"<<endl;
+               bool t;
+               cin>>t;
+               if(t) withtraffic(adj,cityid[home],cityid[destination],cityid2,shid2,cityid,shid);
+               else withouttraffic(adj,cityid[home],cityid[destination],cityid2,shid2,cityid,shid);
+           }
+       }
+       if(n==2){
+           cout<<"Enter source:"<<endl;
+           string current;
+           cin>>current;
+           if(cityid[current]==0){
+               cout<<"Sorry currently we dont have data for the entered source city"<<endl;
+               continue;
+           }
+           cout<<"Enter destination:"<<endl;
+               string destination;
+               cin>>destination;
+               if(cityid[destination]==0){
+               cout<<"Sorry currently we dont have data for the entered destination city"<<endl;
+               continue;
+           }
+               cout<<"do you want to consider traffic ? (0 for no and 1 for yes)"<<endl;
+               bool t;
+               cin>>t;
+               if(t) withtraffic(adj,cityid[current],cityid[destination],cityid2,shid2,cityid,shid);
+               else withouttraffic(adj,cityid[current],cityid[destination],cityid2,shid2,cityid,shid);
+       }
+   }
+    return 0;
+}
